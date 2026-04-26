@@ -1,5 +1,6 @@
 // Lectorum - entry point
 // Inicializa router de pestañas, registra service worker, conecta UI.
+// v0.5: pre-carga scanner lib en background.
 
 import {
   renderLibrary,
@@ -9,6 +10,7 @@ import {
   renderSettings,
   openAddBookModal
 } from './views.js';
+import { preloadScanner } from './scanner.js';
 
 const VIEWS = {
   library: renderLibrary,
@@ -29,28 +31,31 @@ async function navigate(viewName) {
   });
 
   const container = document.getElementById('view-container');
-  container.innerHTML = '<p class="muted text-center">Cargando…</p>';
+  container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><span>Cargando…</span></div>';
   try {
     await VIEWS[viewName](container);
   } catch (e) {
     console.error('Error renderizando vista:', e);
-    container.innerHTML = `<p class="muted text-center">Error: ${e.message}</p>`;
+    container.innerHTML = `<div class="empty-state"><h2>Algo se rompió</h2><p>${e.message}</p></div>`;
   }
 }
 
 function init() {
-  // Listeners de pestañas
   document.querySelectorAll('.tab-item').forEach((el) => {
     el.addEventListener('click', () => navigate(el.dataset.view));
   });
 
-  // Botón añadir
   document.getElementById('btn-add').addEventListener('click', () => openAddBookModal());
 
   // Vista inicial
   navigate('library');
 
-  // Registrar service worker (offline)
+  // Pre-cargar scanner library en background tras el primer paint
+  setTimeout(() => {
+    preloadScanner().catch((e) => console.warn('Scanner preload failed:', e));
+  }, 1500);
+
+  // Service Worker para offline
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./service-worker.js')

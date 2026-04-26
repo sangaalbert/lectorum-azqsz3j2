@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#0a0a0c" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="color-scheme" content="light">
 
   <!-- Privacidad: pedimos a buscadores que NO indexen esta URL -->
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
@@ -17,53 +17,61 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Lectorum">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- Tipografía Inter (fallback a system fonts si no carga) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Estilos -->
   <link rel="stylesheet" href="styles/main.css">
 
-  <!-- Librería para scanner ISBN, cargada solo cuando se necesita -->
-  <!-- (se carga de forma lazy desde js/scanner.js para no penalizar el arranque) -->
+  <!-- Pre-cargamos la lib de scanner para que el primer click sea instantáneo -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/html5-qrcode.min.js" as="script">
 </head>
 <body>
   <div id="app">
     <!-- App Bar superior -->
-    <header class="app-bar glass">
+    <header class="app-bar">
       <h1 id="page-title">Biblioteca</h1>
       <div class="app-bar-actions">
-        <button id="btn-add" class="btn-icon" aria-label="Añadir libro">+</button>
+        <button id="btn-add" class="btn-icon" aria-label="Añadir libro" title="Añadir libro">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+        </button>
       </div>
     </header>
 
     <!-- Contenedor principal donde se renderizan las vistas -->
     <main id="view-container"></main>
 
-    <!-- Tab Bar inferior -->
-    <nav class="tab-bar glass" aria-label="Navegación">
+    <!-- Tab Bar inferior con iconos SVG line estilo Notion -->
+    <nav class="tab-bar" aria-label="Navegación">
       <button class="tab-item" data-view="library" aria-label="Biblioteca">
-        <span class="tab-icon">📚</span>
-        <span class="tab-label">Biblioteca</span>
+        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20V4H6.5A2.5 2.5 0 004 6.5v13zM4 19.5A2.5 2.5 0 006.5 22H20v-5H6.5A2.5 2.5 0 004 19.5z" stroke-linejoin="round"/></svg>
+        <span>Biblioteca</span>
       </button>
-      <button class="tab-item" data-view="dashboard" aria-label="Dashboard">
-        <span class="tab-icon">📊</span>
-        <span class="tab-label">Stats</span>
+      <button class="tab-item" data-view="dashboard" aria-label="Stats">
+        <svg viewBox="0 0 24 24"><path d="M3 3v18h18M8 14v3M13 10v7M18 6v11" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Stats</span>
       </button>
       <button class="tab-item" data-view="wishlist" aria-label="Wishlist">
-        <span class="tab-icon">⭐</span>
-        <span class="tab-label">Deseos</span>
+        <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6L12 2z" stroke-linejoin="round"/></svg>
+        <span>Deseos</span>
       </button>
       <button class="tab-item" data-view="collections" aria-label="Colecciones">
-        <span class="tab-icon">🏷️</span>
-        <span class="tab-label">Listas</span>
+        <svg viewBox="0 0 24 24"><path d="M20 13.74V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2h7.5M14 9H8M11 13H8M16 16l3 3 5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Listas</span>
       </button>
       <button class="tab-item" data-view="settings" aria-label="Ajustes">
-        <span class="tab-icon">⚙️</span>
-        <span class="tab-label">Ajustes</span>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.5 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2.5a2 2 0 010-4h.09A1.65 1.65 0 004.6 8.5a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2.5a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Ajustes</span>
       </button>
     </nav>
 
-    <!-- Modal genérico (para añadir libros, scanner, detalle) -->
+    <!-- Modal genérico -->
     <div id="modal-root" class="modal-root hidden" aria-hidden="true"></div>
   </div>
 
