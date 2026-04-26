@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0c" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)">
+
+  <!-- Privacidad: pedimos a buscadores que NO indexen esta URL -->
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+  <meta name="googlebot" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+
+  <title>Lectorum</title>
+
+  <!-- PWA / iOS -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Lectorum">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="styles/main.css">
+
+  <!-- Librería para scanner ISBN, cargada solo cuando se necesita -->
+  <!-- (se carga de forma lazy desde js/scanner.js para no penalizar el arranque) -->
+</head>
+<body>
+  <div id="app">
+    <!-- App Bar superior -->
+    <header class="app-bar glass">
+      <h1 id="page-title">Biblioteca</h1>
+      <div class="app-bar-actions">
+        <button id="btn-add" class="btn-icon" aria-label="Añadir libro">+</button>
+      </div>
+    </header>
+
+    <!-- Contenedor principal donde se renderizan las vistas -->
+    <main id="view-container"></main>
+
+    <!-- Tab Bar inferior -->
+    <nav class="tab-bar glass" aria-label="Navegación">
+      <button class="tab-item" data-view="library" aria-label="Biblioteca">
+        <span class="tab-icon">📚</span>
+        <span class="tab-label">Biblioteca</span>
+      </button>
+      <button class="tab-item" data-view="dashboard" aria-label="Dashboard">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">Stats</span>
+      </button>
+      <button class="tab-item" data-view="wishlist" aria-label="Wishlist">
+        <span class="tab-icon">⭐</span>
+        <span class="tab-label">Deseos</span>
+      </button>
+      <button class="tab-item" data-view="collections" aria-label="Colecciones">
+        <span class="tab-icon">🏷️</span>
+        <span class="tab-label">Listas</span>
+      </button>
+      <button class="tab-item" data-view="settings" aria-label="Ajustes">
+        <span class="tab-icon">⚙️</span>
+        <span class="tab-label">Ajustes</span>
+      </button>
+    </nav>
+
+    <!-- Modal genérico (para añadir libros, scanner, detalle) -->
+    <div id="modal-root" class="modal-root hidden" aria-hidden="true"></div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
