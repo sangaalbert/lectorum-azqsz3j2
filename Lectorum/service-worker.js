@@ -1,7 +1,7 @@
 // Lectorum service worker
 // Estrategia: cache-first para shell, network-first para APIs externas.
 
-const CACHE_NAME = 'lectorum-v1';
+const CACHE_NAME = 'lectorum-v3';
 const APP_SHELL = [
   './',
   './index.html',

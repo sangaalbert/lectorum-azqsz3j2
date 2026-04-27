@@ -1,5 +1,5 @@
-// Lectorum v0.5 - vistas inspiradas en Notion mobile
-// Layout: rows en vez de grid, properties panel para detalle, mejor búsqueda.
+// Lectorum v0.7 - vistas con estética editorial profesional
+// Hero "Leyendo ahora", búsqueda local, compartir, sin foco en páginas.
 
 import * as db from './db.js';
 import * as api from './api.js';
@@ -14,11 +14,10 @@ const STATUS_LABELS = {
 
 const STATUS_ORDER = ['reading', 'wishlist', 'read', 'abandoned'];
 
-// === Iconos SVG inline (Notion line-style, stroke 1.75) ===
+// === Iconos SVG inline ===
 const Icons = {
   status: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>',
-  pages: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>',
   calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   hash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
@@ -27,7 +26,8 @@ const Icons = {
   book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20V4H6.5A2.5 2.5 0 004 6.5v13z"/></svg>',
   star_outline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>',
   trending: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M23 6l-9.5 9.5-5-5L1 18M17 6h6v6"/></svg>',
-  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M20 21H4a1 1 0 01-1-1v-8"/></svg>',
+  layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l10 6-10 6L2 8l10-6z"/><path d="M2 16l10 6 10-6M2 12l10 6 10-6"/></svg>'
 };
 
 // === Helpers ===
@@ -61,10 +61,10 @@ function bookRow(book) {
         <p class="book-row-author">${escape(authors)}</p>
       </div>
       <div class="book-row-status">
-        <span class="status-pill ${status}">
+        <button class="status-pill ${status}" data-book-id="${escape(book.id)}" data-current-status="${status}" aria-label="Cambiar estado">
           <span class="status-dot"></span>
           ${STATUS_LABELS[status]}
-        </span>
+        </button>
       </div>
     </div>
   `;
@@ -79,7 +79,7 @@ function emptyState(iconKey, title, subtitle, ctaLabel, ctaHandler) {
 
   return `
     <div class="empty-state">
-      ${Icons[iconKey] || Icons.book}
+      <div class="empty-state-illustration">${Icons[iconKey] || Icons.book}</div>
       <h2>${escape(title)}</h2>
       <p>${escape(subtitle)}</p>
       ${ctaLabel ? `<button class="btn-primary" id="${id}">${escape(ctaLabel)}</button>` : ''}
@@ -98,6 +98,12 @@ function showToast(message) {
 
 function loadingHTML(text = 'Cargando…') {
   return `<div class="loading"><div class="loading-spinner"></div><span>${escape(text)}</span></div>`;
+}
+
+function daysSince(timestamp) {
+  if (!timestamp) return 0;
+  const ms = Date.now() - timestamp;
+  return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
 }
 
 // === Modal ===
@@ -125,54 +131,197 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeModal();
 });
 
+// === Hero "Leyendo ahora" ===
+
+function renderNowReadingHero(book) {
+  const authors = (book.authors || []).join(', ') || 'Sin autor';
+  const days = daysSince(book.startedAt);
+  const dayText = days === 0 ? 'Empezado hoy' : days === 1 ? 'Llevas 1 día leyendo' : `Llevas ${days} días leyendo`;
+
+  const bgImage = book.coverUrl
+    ? `<div class="now-reading-hero-bg" style="background: url('${escape(book.coverUrl)}') center/cover no-repeat;"></div>`
+    : '';
+
+  return `
+    <div class="now-reading-hero" data-book-id="${escape(book.id)}">
+      ${bgImage}
+      <div class="now-reading-hero-overlay"></div>
+      <div class="now-reading-content">
+        <div class="now-reading-cover">
+          ${book.coverUrl
+            ? `<img src="${escape(book.coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+            : `<div class="book-row-cover-fallback" style="font-size:11px">${escape(book.title)}</div>`}
+        </div>
+        <div class="now-reading-info">
+          <p class="now-reading-eyebrow">Leyendo ahora</p>
+          <h2 class="now-reading-title">${escape(book.title)}</h2>
+          <p class="now-reading-author">${escape(authors)}</p>
+          <p class="now-reading-meta">${escape(dayText)}</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // === Vista: Biblioteca ===
+
+let librarySearchQuery = '';
 
 export async function renderLibrary(container) {
   document.getElementById('page-title').textContent = 'Biblioteca';
 
-  const books = await db.getAllBooks();
+  const allBooks = await db.getAllBooks();
+
+  if (allBooks.length === 0) {
+    container.innerHTML = emptyState(
+      'book',
+      'Tu biblioteca está vacía',
+      'Empieza por el libro que tienes entre manos o uno que te apetezca leer pronto.',
+      'Añadir mi primer libro',
+      openAddBookModal
+    );
+    return;
+  }
+
+  // Filtro local
+  const q = librarySearchQuery.trim().toLowerCase();
+  const books = q
+    ? allBooks.filter((b) =>
+        b.title.toLowerCase().includes(q) ||
+        (b.authors || []).join(' ').toLowerCase().includes(q))
+    : allBooks;
+
   books.sort((a, b) => {
     if (a.status === 'reading' && b.status !== 'reading') return -1;
     if (b.status === 'reading' && a.status !== 'reading') return 1;
     return (b.updatedAt || 0) - (a.updatedAt || 0);
   });
 
-  if (books.length === 0) {
-    container.innerHTML = emptyState(
-      'book',
-      'Tu biblioteca está vacía',
-      'Empieza añadiendo el libro que estás leyendo o uno que te apetezca leer.',
-      'Añadir libro',
-      openAddBookModal
-    );
-    return;
-  }
-
-  // Agrupar por estado
-  const byStatus = { reading: [], wishlist: [], read: [], abandoned: [] };
-  for (const b of books) byStatus[b.status || 'wishlist'].push(b);
+  const reading = books.filter((b) => b.status === 'reading');
+  const wishlist = books.filter((b) => b.status === 'wishlist');
+  const read = books.filter((b) => b.status === 'read');
+  const abandoned = books.filter((b) => b.status === 'abandoned');
 
   let html = '';
-  if (byStatus.reading.length) {
-    html += `<div class="section-title">Leyendo ahora · ${byStatus.reading.length}</div>`;
-    html += `<div class="book-list">${byStatus.reading.map(bookRow).join('')}</div>`;
+
+  // Hero solo si NO hay búsqueda activa y hay libros leyendo
+  if (!q && reading.length > 0) {
+    html += renderNowReadingHero(reading[0]);
+    if (reading.length > 1) {
+      html += `<div class="section-title">Otros libros activos</div>`;
+      html += `<div class="book-list">${reading.slice(1).map(bookRow).join('')}</div>`;
+    }
+  } else if (reading.length > 0) {
+    html += `<div class="section-title">Leyendo · ${reading.length}</div>`;
+    html += `<div class="book-list">${reading.map(bookRow).join('')}</div>`;
   }
-  if (byStatus.wishlist.length) {
-    html += `<div class="section-title">Quiero leer · ${byStatus.wishlist.length}</div>`;
-    html += `<div class="book-list">${byStatus.wishlist.map(bookRow).join('')}</div>`;
+
+  // Search bar (si hay >5 libros)
+  if (allBooks.length >= 5) {
+    html = `
+      <div class="library-search">
+        ${Icons.search}
+        <input type="search" id="lib-search" placeholder="Buscar en mi biblioteca…" value="${escape(librarySearchQuery)}" autocomplete="off">
+      </div>
+    ` + html;
   }
-  if (byStatus.read.length) {
-    html += `<div class="section-title">Leídos · ${byStatus.read.length}</div>`;
-    html += `<div class="book-list">${byStatus.read.map(bookRow).join('')}</div>`;
+
+  if (wishlist.length) {
+    html += `<div class="section-title">Quiero leer · ${wishlist.length}</div>`;
+    html += `<div class="book-list">${wishlist.map(bookRow).join('')}</div>`;
   }
-  if (byStatus.abandoned.length) {
-    html += `<div class="section-title">Abandonados · ${byStatus.abandoned.length}</div>`;
-    html += `<div class="book-list">${byStatus.abandoned.map(bookRow).join('')}</div>`;
+  if (read.length) {
+    html += `<div class="section-title">Leídos · ${read.length}</div>`;
+    html += `<div class="book-list">${read.map(bookRow).join('')}</div>`;
+  }
+  if (abandoned.length) {
+    html += `<div class="section-title">Abandonados · ${abandoned.length}</div>`;
+    html += `<div class="book-list">${abandoned.map(bookRow).join('')}</div>`;
+  }
+
+  if (q && books.length === 0) {
+    html += `
+      <div class="empty-state" style="padding:36px 20px">
+        <div class="empty-state-illustration">${Icons.search}</div>
+        <h2>Nada coincide</h2>
+        <p>Prueba con otras palabras o añade un libro nuevo.</p>
+      </div>
+    `;
   }
 
   container.innerHTML = html;
+  attachLibraryHandlers(container);
+}
+
+function attachLibraryHandlers(container) {
+  // Search
+  const searchInput = container.querySelector('#lib-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      librarySearchQuery = e.target.value;
+      // Re-render manteniendo el foco
+      renderLibrary(container).then(() => {
+        const newInput = container.querySelector('#lib-search');
+        if (newInput) {
+          newInput.focus();
+          newInput.setSelectionRange(librarySearchQuery.length, librarySearchQuery.length);
+        }
+      });
+    });
+  }
+
+  // Hero click
+  const hero = container.querySelector('.now-reading-hero');
+  if (hero) hero.addEventListener('click', () => openBookDetail(hero.dataset.bookId));
+
+  // Book rows click
   container.querySelectorAll('.book-row').forEach((el) => {
-    el.addEventListener('click', () => openBookDetail(el.dataset.bookId));
+    el.addEventListener('click', (e) => {
+      // Si han clicado el status pill, no abrir detalle
+      if (e.target.closest('.status-pill')) return;
+      openBookDetail(el.dataset.bookId);
+    });
+  });
+
+  // Status pill quick toggle
+  container.querySelectorAll('.status-pill[data-book-id]').forEach((pill) => {
+    pill.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      openQuickStatusModal(pill.dataset.bookId, pill.dataset.currentStatus);
+    });
+  });
+}
+
+function openQuickStatusModal(bookId, currentStatus) {
+  openModal(`
+    <h2 class="modal-title">Cambiar estado</h2>
+    <div class="action-list">
+      ${STATUS_ORDER.map((s) => `
+        <button class="action-item" data-status="${s}">
+          <span class="action-item-icon">
+            <span class="status-dot" style="background: var(--status-${s}-fg); width: 10px; height: 10px;"></span>
+          </span>
+          <div class="action-item-content">
+            <p class="action-item-title">${STATUS_LABELS[s]}${s === currentStatus ? ' · actual' : ''}</p>
+          </div>
+        </button>
+      `).join('')}
+    </div>
+  `);
+
+  document.querySelectorAll('.action-item[data-status]').forEach((el) => {
+    el.onclick = async () => {
+      const newStatus = el.dataset.status;
+      const book = await db.getBook(bookId);
+      if (!book) return;
+      const updates = { ...book, status: newStatus };
+      if (newStatus === 'reading' && !book.startedAt) updates.startedAt = Date.now();
+      if (newStatus === 'read' && !book.finishedAt) updates.finishedAt = Date.now();
+      await db.saveBook(updates);
+      closeModal();
+      showToast(`Marcado como "${STATUS_LABELS[newStatus]}"`);
+      renderLibrary(document.getElementById('view-container'));
+    };
   });
 }
 
@@ -194,10 +343,10 @@ export async function renderWishlist(container) {
     return;
   }
 
+  books.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
   container.innerHTML = `<div class="book-list">${books.map(bookRow).join('')}</div>`;
-  container.querySelectorAll('.book-row').forEach((el) => {
-    el.addEventListener('click', () => openBookDetail(el.dataset.bookId));
-  });
+  attachLibraryHandlers(container);
 }
 
 // === Vista: Colecciones ===
@@ -209,10 +358,10 @@ export async function renderCollections(container) {
 
   if (collections.length === 0) {
     container.innerHTML = emptyState(
-      'edit',
+      'layers',
       'Aún no tienes listas',
       'Las listas son colecciones temáticas como "Verano 2026" o "Club de lectura".',
-      'Nueva lista',
+      'Crear una lista',
       openNewCollectionModal
     );
     return;
@@ -257,7 +406,7 @@ function openNewCollectionModal() {
   };
 }
 
-// === Vista: Dashboard ===
+// === Vista: Dashboard (sin foco en páginas) ===
 
 export async function renderDashboard(container) {
   document.getElementById('page-title').textContent = 'Stats';
@@ -273,9 +422,7 @@ export async function renderDashboard(container) {
   const reading = books.filter((b) => b.status === 'reading');
   const wishlist = books.filter((b) => b.status === 'wishlist');
 
-  const pagesThisYear = readThisYear.reduce((sum, b) => sum + (b.pageCount || 0), 0);
-  const totalPages = readBooks.reduce((sum, b) => sum + (b.pageCount || 0), 0);
-
+  // Top autores leídos
   const authorCount = {};
   for (const b of readBooks) {
     for (const a of b.authors || []) {
@@ -284,8 +431,18 @@ export async function renderDashboard(container) {
   }
   const topAuthors = Object.entries(authorCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
+  // Rating medio
   const rated = readBooks.filter((b) => typeof b.rating === 'number' && b.rating > 0);
   const avgRating = rated.length ? (rated.reduce((s, b) => s + b.rating, 0) / rated.length).toFixed(1) : '—';
+
+  // Mejor valorado del año
+  const ratedThisYear = readThisYear.filter((b) => typeof b.rating === 'number' && b.rating > 0);
+  const topRatedThisYear = ratedThisYear.length
+    ? ratedThisYear.reduce((best, b) => (b.rating > (best?.rating || 0) ? b : best), null)
+    : null;
+
+  // Días en racha (libros terminados en últimos 30 días)
+  const last30Days = readBooks.filter((b) => b.finishedAt && (Date.now() - b.finishedAt) < 30 * 24 * 60 * 60 * 1000).length;
 
   container.innerHTML = `
     <div class="section-title">Este año · ${currentYear}</div>
@@ -295,8 +452,9 @@ export async function renderDashboard(container) {
         <div class="stat-card-value">${readThisYear.length}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card-label">${Icons.pages}<span>Páginas</span></div>
-        <div class="stat-card-value">${pagesThisYear.toLocaleString('es-ES')}</div>
+        <div class="stat-card-label">${Icons.star}<span>Rating medio</span></div>
+        <div class="stat-card-value">${avgRating}</div>
+        <div class="stat-card-sub">${rated.length} valoraciones</div>
       </div>
     </div>
 
@@ -305,7 +463,6 @@ export async function renderDashboard(container) {
       <div class="stat-card">
         <div class="stat-card-label">${Icons.book}<span>Total leídos</span></div>
         <div class="stat-card-value">${readBooks.length}</div>
-        <div class="stat-card-sub">${totalPages.toLocaleString('es-ES')} páginas</div>
       </div>
       <div class="stat-card">
         <div class="stat-card-label">${Icons.trending}<span>Leyendo ahora</span></div>
@@ -316,11 +473,18 @@ export async function renderDashboard(container) {
         <div class="stat-card-value">${wishlist.length}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card-label">${Icons.star}<span>Rating medio</span></div>
-        <div class="stat-card-value">${avgRating}</div>
-        <div class="stat-card-sub">${rated.length} valoraciones</div>
+        <div class="stat-card-label">${Icons.calendar}<span>Últimos 30 días</span></div>
+        <div class="stat-card-value">${last30Days}</div>
+        <div class="stat-card-sub">terminados</div>
       </div>
     </div>
+
+    ${topRatedThisYear ? `
+      <div class="section-title">Lo mejor del año</div>
+      <div class="book-list">
+        ${bookRow(topRatedThisYear)}
+      </div>
+    ` : ''}
 
     ${topAuthors.length > 0 ? `
       <div class="section-title">Autores más leídos</div>
@@ -334,6 +498,9 @@ export async function renderDashboard(container) {
       </div>
     ` : ''}
   `;
+
+  // Bind handlers para el "Lo mejor del año"
+  attachLibraryHandlers(container);
 }
 
 // === Vista: Ajustes ===
@@ -367,7 +534,7 @@ export async function renderSettings(container) {
     <div class="settings-section">
       <div class="settings-row">
         <span class="settings-row-label">Versión</span>
-        <span class="settings-row-value">v0.5</span>
+        <span class="settings-row-value">v0.7</span>
       </div>
     </div>
     <p class="tertiary mt-8">Tus datos viven solo en este iPhone. Si desinstalas la app, los pierdes (a menos que hayas exportado un backup).</p>
@@ -405,7 +572,6 @@ export async function renderSettings(container) {
 // === Modal: añadir libro ===
 
 export function openAddBookModal() {
-  // Pre-cargar la lib del scanner si aún no está
   preloadScanner().catch(() => {});
 
   openModal(`
@@ -466,11 +632,11 @@ function openSearchModal() {
       results.innerHTML = loadingHTML('Buscando…');
       try {
         const books = await api.searchBooks(q);
-        if (q !== lastQuery) return; // outdated
+        if (q !== lastQuery) return;
         if (books.length === 0) {
           results.innerHTML = `
             <div class="empty-state" style="padding:32px 20px">
-              ${Icons.search}
+              <div class="empty-state-illustration">${Icons.search}</div>
               <h2>Sin resultados</h2>
               <p>Prueba con otras palabras o añade el libro manualmente.</p>
             </div>
@@ -485,7 +651,7 @@ function openSearchModal() {
             <div class="search-result-info">
               <h3 class="search-result-title">${escape(b.title)}</h3>
               <p class="search-result-author">${escape((b.authors || []).join(', ') || 'Sin autor')}</p>
-              <p class="search-result-meta">${[b.publishedYear, b.pageCount ? b.pageCount + ' págs' : null, b.language === 'es' ? 'Español' : b.language].filter(Boolean).join(' · ')}</p>
+              <p class="search-result-meta">${[b.publishedYear, b.publisher, b.language === 'es' ? 'Español' : (b.language === 'en' ? 'Inglés' : null)].filter(Boolean).join(' · ')}</p>
             </div>
           </div>
         `).join('')}</div>`;
@@ -595,10 +761,6 @@ function openManualEntryModal(prefill = {}) {
       <input type="text" id="m-author" value="${escape((prefill.authors || []).join(', '))}" placeholder="Separados por comas">
     </div>
     <div class="form-group">
-      <label>Páginas</label>
-      <input type="number" id="m-pages" value="${prefill.pageCount || ''}" inputmode="numeric">
-    </div>
-    <div class="form-group">
       <label>Año</label>
       <input type="number" id="m-year" value="${prefill.publishedYear || ''}" inputmode="numeric">
     </div>
@@ -626,8 +788,8 @@ function openManualEntryModal(prefill = {}) {
     const book = {
       title,
       authors: document.getElementById('m-author').value.split(',').map((s) => s.trim()).filter(Boolean),
-      pageCount: parseInt(document.getElementById('m-pages').value) || null,
       publishedYear: parseInt(document.getElementById('m-year').value) || prefill.publishedYear || null,
+      pageCount: prefill.pageCount || null,
       isbn: document.getElementById('m-isbn').value.trim() || null,
       status,
       coverUrl: prefill.coverUrl || null,
@@ -675,7 +837,7 @@ function openSaveBookModal(bookData) {
   };
 }
 
-// === Detalle de libro (estilo Notion: properties panel) ===
+// === Detalle de libro ===
 
 async function openBookDetail(bookId) {
   const book = await db.getBook(bookId);
@@ -692,8 +854,14 @@ async function openBookDetail(bookId) {
     return html;
   };
 
+  const heroBg = book.coverUrl
+    ? `<div class="book-detail-hero-bg" style="background: url('${escape(book.coverUrl)}') center/cover no-repeat;"></div>
+       <div class="book-detail-hero-overlay"></div>`
+    : '';
+
   openModal(`
     <div class="book-detail">
+      ${heroBg}
       ${bookCover(book, 'book-detail-cover')}
       <h2>${escape(book.title)}</h2>
       <p class="book-detail-author">${escape((book.authors || []).join(', ') || 'Sin autor')}</p>
@@ -714,12 +882,6 @@ async function openBookDetail(bookId) {
           <div class="property-key">${Icons.star}<span>Valoración</span></div>
           <div class="property-value">${stars(book.rating)}</div>
         </div>
-
-        ${book.pageCount ? `
-        <div class="property-row">
-          <div class="property-key">${Icons.pages}<span>Páginas</span></div>
-          <div class="property-value">${book.pageCount}</div>
-        </div>` : ''}
 
         ${book.publishedYear ? `
         <div class="property-row">
@@ -742,17 +904,20 @@ async function openBookDetail(bookId) {
         ${book.isbn ? `
         <div class="property-row">
           <div class="property-key">${Icons.hash}<span>ISBN</span></div>
-          <div class="property-value tertiary">${escape(book.isbn)}</div>
+          <div class="property-value property-value-tertiary">${escape(book.isbn)}</div>
         </div>` : ''}
       </div>
 
       <div class="notes-section">
         <div class="section-title">Notas</div>
-        <textarea class="notes-textarea" id="d-notes" placeholder="Escribe lo que pensaste, citas, reseñas...">${escape(book.notes || '')}</textarea>
+        <textarea class="notes-textarea" id="d-notes" placeholder="Lo que pensaste, citas favoritas, reseña...">${escape(book.notes || '')}</textarea>
       </div>
 
       <button class="btn-primary mt-16" id="btn-save-detail">Guardar cambios</button>
-      <button class="btn-secondary" id="btn-close-detail">Cerrar</button>
+      <div class="detail-actions">
+        <button class="btn-secondary" id="btn-share">Compartir</button>
+        <button class="btn-secondary" id="btn-close-detail">Cerrar</button>
+      </div>
       <button class="btn-danger" id="btn-delete">Eliminar libro</button>
     </div>
   `);
@@ -769,6 +934,28 @@ async function openBookDetail(bookId) {
   });
 
   document.getElementById('btn-close-detail').onclick = closeModal;
+
+  document.getElementById('btn-share').onclick = async () => {
+    const authors = (book.authors || []).join(', ') || 'Sin autor';
+    const stars = currentRating ? '★'.repeat(currentRating) + '☆'.repeat(5 - currentRating) : '';
+    const statusText = STATUS_LABELS[book.status] || '';
+    const text = `📖 ${book.title}\n${authors}${stars ? '\n' + stars : ''}${statusText ? '\n' + statusText : ''}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: book.title, text });
+      } catch (e) {
+        if (e.name !== 'AbortError') showToast('No se pudo compartir');
+      }
+    } else {
+      // Fallback: copiar al clipboard
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('Copiado al portapapeles');
+      } catch {
+        showToast('Compartir no disponible');
+      }
+    }
+  };
 
   document.getElementById('btn-save-detail').onclick = async () => {
     const newStatus = document.getElementById('d-status').value;
